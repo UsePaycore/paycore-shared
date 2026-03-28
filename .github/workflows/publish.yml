@@ -1,0 +1,49 @@
+name: Publish Packages
+
+on:
+  push:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        package: [paycore-domain, paycore-rabbitmq, paycore-persistence]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Build package
+        run: cd packages/${{ matrix.package }} && python -m build
+
+      - name: Verify package
+        run: twine check packages/${{ matrix.package }}/dist/*
+
+      - name: Install and verify
+        run: |
+          pip install -e packages/paycore-domain
+          if [ "${{ matrix.package }}" != "paycore-domain" ]; then
+            pip install -e packages/${{ matrix.package }}
+          fi
+          MODULE_NAME=$(echo "${{ matrix.package }}" | tr '-' '_')
+          python -c "import ${MODULE_NAME}; print('Import OK')"
+
+      - name: Upload wheel as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.package }}-dist
+          path: packages/${{ matrix.package }}/dist/
+          retention-days: 90

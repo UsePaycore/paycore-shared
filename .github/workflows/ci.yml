@@ -6,43 +6,37 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  PYTHON_VERSION: "3.11"
+
 jobs:
   lint:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        package:
-          - paycore-domain
-          - paycore-rabbitmq
-          - paycore-persistence
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install ruff
         run: pip install ruff
 
-      - name: Lint ${{ matrix.package }}
-        run: ruff check packages/${{ matrix.package }}/
+      - name: Lint all packages
+        run: ruff check packages/
 
   test:
     runs-on: ubuntu-latest
     needs: lint
     strategy:
       matrix:
-        package:
-          - paycore-domain
-          - paycore-rabbitmq
-          - paycore-persistence
+        package: [paycore-domain, paycore-rabbitmq, paycore-persistence]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
         run: |
@@ -53,6 +47,23 @@ jobs:
           fi
           if [ "${{ matrix.package }}" = "paycore-persistence" ]; then
             pip install -e packages/paycore-persistence
+          fi
+
+      - name: Verify imports for ${{ matrix.package }}
+        run: |
+          if [ "${{ matrix.package }}" = "paycore-domain" ]; then
+            python -c "from paycore_domain.entities import Entity; print('entities OK')"
+            python -c "from paycore_domain.value_objects import TenantId; print('value_objects OK')"
+            python -c "from paycore_domain.exceptions import NotFoundException; print('exceptions OK')"
+            python -c "from paycore_domain.cqrs import Command, CommandHandler; print('cqrs OK')"
+            python -c "from paycore_domain.events import DomainEvent; print('events OK')"
+            python -c "from paycore_domain.ports import UnitOfWork; print('ports OK')"
+          fi
+          if [ "${{ matrix.package }}" = "paycore-rabbitmq" ]; then
+            python -c "from paycore_rabbitmq import RabbitMqConnection; print('rabbitmq OK')"
+          fi
+          if [ "${{ matrix.package }}" = "paycore-persistence" ]; then
+            python -c "from paycore_persistence import Base, BaseModel, TimestampMixin; print('persistence OK')"
           fi
 
       - name: Run tests for ${{ matrix.package }}
