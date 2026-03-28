@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 class RetryConfig:
     max_retries: int = 3
     retry_ttl_ms: int = 5000
+    backoff_multiplier: int = 5
     dead_letter_ttl_ms: int = 86400000
 
 
@@ -90,7 +91,6 @@ class RabbitMqConsumerWithRetry(ABC):
         self._connection.declare_queue_with_dlx(
             queue_name=self._retry_queue,
             dead_letter_exchange=self._exchange_name,
-            message_ttl=self._retry_config.retry_ttl_ms,
         )
         for routing_key in self._routing_keys:
             self._connection.bind_queue(
@@ -100,7 +100,7 @@ class RabbitMqConsumerWithRetry(ABC):
             )
         logger.info(
             f"Retry queue configured: {self._retry_queue} "
-            f"(TTL: {self._retry_config.retry_ttl_ms}ms)"
+            f"(per-message TTL with exponential backoff)"
         )
 
     def _setup_main_queue(self) -> None:
@@ -153,6 +153,11 @@ class RabbitMqConsumerWithRetry(ABC):
             return int(properties.headers[self.RETRY_COUNT_HEADER])
         return 0
 
+    def _calculate_retry_ttl(self, retry_count: int) -> int:
+        return self._retry_config.retry_ttl_ms * (
+            self._retry_config.backoff_multiplier ** retry_count
+        )
+
     def _handle_failure(
         self,
         channel: BlockingChannel,
@@ -172,11 +177,12 @@ class RabbitMqConsumerWithRetry(ABC):
             )
             self._send_to_dead_letter(method.routing_key, properties, body)
         else:
+            ttl = self._calculate_retry_ttl(retry_count)
             logger.info(
                 f"Scheduling retry {new_retry_count}/{self._retry_config.max_retries} "
-                f"in {self._retry_config.retry_ttl_ms}ms"
+                f"in {ttl}ms"
             )
-            self._send_to_retry(method.routing_key, properties, body, new_retry_count)
+            self._send_to_retry(method.routing_key, properties, body, new_retry_count, ttl)
 
     def _send_to_retry(
         self,
@@ -184,6 +190,7 @@ class RabbitMqConsumerWithRetry(ABC):
         original_properties: BasicProperties,
         body: bytes,
         retry_count: int,
+        ttl_ms: int,
     ) -> None:
         headers = dict(original_properties.headers or {})
         headers[self.RETRY_COUNT_HEADER] = retry_count
@@ -195,6 +202,7 @@ class RabbitMqConsumerWithRetry(ABC):
             content_encoding="utf-8",
             delivery_mode=2,
             headers=headers,
+            expiration=str(ttl_ms),
         )
 
         self._connection.channel().basic_publish(
