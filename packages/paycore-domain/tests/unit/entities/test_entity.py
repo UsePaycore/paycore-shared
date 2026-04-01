@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from paycore_domain.entities import Entity
 from paycore_domain.value_objects import EntityId
@@ -21,15 +21,15 @@ class TestEntity:
         assert entity.id == entity_id
 
     def test_sets_created_at_on_init(self):
-        before = datetime.utcnow()
+        before = datetime.now(UTC)
         entity = ConcreteEntity(id=EntityId.generate(), name="Test")
-        after = datetime.utcnow()
+        after = datetime.now(UTC)
         assert before <= entity.created_at <= after
 
     def test_sets_updated_at_on_init(self):
-        before = datetime.utcnow()
+        before = datetime.now(UTC)
         entity = ConcreteEntity(id=EntityId.generate(), name="Test")
-        after = datetime.utcnow()
+        after = datetime.now(UTC)
         assert before <= entity.updated_at <= after
 
     def test_update_timestamp_changes_updated_at(self):

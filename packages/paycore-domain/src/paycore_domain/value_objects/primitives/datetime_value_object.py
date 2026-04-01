@@ -1,6 +1,6 @@
 from abc import ABC
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 from .value_object import ValueObject
 
@@ -49,4 +49,4 @@ class DateTimeValueObject(ValueObject, ABC):
 
     @classmethod
     def now(cls) -> "DateTimeValueObject":
-        return cls(value=datetime.utcnow())
+        return cls(value=datetime.now(UTC))

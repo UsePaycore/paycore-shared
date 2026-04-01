@@ -2,7 +2,6 @@ import json
 import logging
 import threading
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -11,19 +10,12 @@ from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
 
 from paycore_rabbitmq.connection import RabbitMqConnection
+from paycore_rabbitmq.consumer.retry_config import RetryConfig
 
 HEARTBEAT_PATH = Path("/tmp/worker-heartbeat")  # noqa: S108
 HEARTBEAT_INTERVAL = 30
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class RetryConfig:
-    max_retries: int = 3
-    retry_ttl_ms: int = 5000
-    backoff_multiplier: int = 5
-    dead_letter_ttl_ms: int = 86400000
 
 
 class RabbitMqConsumerWithRetry(ABC):

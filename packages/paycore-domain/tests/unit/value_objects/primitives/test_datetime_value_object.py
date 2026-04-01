@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 from paycore_domain.value_objects.primitives import DateTimeValueObject
 
@@ -66,9 +66,9 @@ class TestDateTimeValueObject:
         assert created.day == 30
 
     def test_now_returns_current_time(self):
-        before = datetime.utcnow()
+        before = datetime.now(UTC)
         created = CreatedAt.now()
-        after = datetime.utcnow()
+        after = datetime.now(UTC)
         assert before <= created.value <= after
 
     def test_equal_objects_are_equal(self):
