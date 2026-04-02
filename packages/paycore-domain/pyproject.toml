@@ -5,7 +5,7 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.urls]
-Repository = "https://github.com/UsePaycore/paycore-shared"
+Repository = "https://github.com/UsePaycore/shared"
 
 [build-system]
 requires = ["setuptools>=69.0"]
