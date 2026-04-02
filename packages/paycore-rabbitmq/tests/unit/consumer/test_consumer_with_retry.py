@@ -2,6 +2,7 @@ import json
 from typing import Any, Dict
 from unittest.mock import MagicMock
 
+import pika
 from pika.spec import Basic, BasicProperties
 
 from paycore_rabbitmq.consumer.consumer_with_retry import (
@@ -157,3 +158,32 @@ class TestExponentialBackoff:
             queue_name="test_queue.retry",
             dead_letter_exchange="test_exchange",
         )
+
+    def test_setup_retry_recreates_queue_on_precondition_failed(self):
+        connection, channel = _create_mock_connection()
+        consumer = FakeConsumer(connection)
+
+        connection.declare_queue_with_dlx.side_effect = [
+            pika.exceptions.ChannelClosedByBroker(406, "PRECONDITION_FAILED"),
+            None,
+        ]
+
+        consumer._setup_retry_infrastructure()
+
+        connection._reconnect.assert_called_once()
+        channel.queue_delete.assert_called_once_with(queue="test_queue.retry")
+        assert connection.declare_queue_with_dlx.call_count == 2
+
+    def test_setup_retry_raises_non_precondition_errors(self):
+        connection, channel = _create_mock_connection()
+        consumer = FakeConsumer(connection)
+
+        connection.declare_queue_with_dlx.side_effect = (
+            pika.exceptions.ChannelClosedByBroker(500, "INTERNAL_ERROR")
+        )
+
+        try:
+            consumer._setup_retry_infrastructure()
+            assert False, "Should have raised"
+        except pika.exceptions.ChannelClosedByBroker as e:
+            assert e.reply_code == 500

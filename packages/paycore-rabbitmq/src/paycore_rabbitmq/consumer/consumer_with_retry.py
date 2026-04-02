@@ -80,10 +80,25 @@ class RabbitMqConsumerWithRetry(ABC):
 
     def _setup_retry_infrastructure(self) -> None:
         self._connection.declare_exchange(self._retry_exchange, "topic")
-        self._connection.declare_queue_with_dlx(
-            queue_name=self._retry_queue,
-            dead_letter_exchange=self._exchange_name,
-        )
+        try:
+            self._connection.declare_queue_with_dlx(
+                queue_name=self._retry_queue,
+                dead_letter_exchange=self._exchange_name,
+            )
+        except pika.exceptions.ChannelClosedByBroker as e:
+            if e.reply_code == 406:
+                logger.warning(
+                    f"Retry queue {self._retry_queue} has mismatched arguments, "
+                    f"recreating: {e.reply_text}"
+                )
+                self._connection._reconnect()
+                self._connection.channel().queue_delete(queue=self._retry_queue)
+                self._connection.declare_queue_with_dlx(
+                    queue_name=self._retry_queue,
+                    dead_letter_exchange=self._exchange_name,
+                )
+            else:
+                raise
         for routing_key in self._routing_keys:
             self._connection.bind_queue(
                 self._retry_queue,
