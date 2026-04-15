@@ -9,6 +9,7 @@ class RabbitMqConfig:
     user: str
     password: str
     vhost: str = "/"
+    heartbeat: int = 600
 
     @classmethod
     def from_env(cls, prefix: str = "RABBITMQ") -> "RabbitMqConfig":
@@ -28,4 +29,5 @@ class RabbitMqConfig:
             user=user or "guest",
             password=password or "guest",
             vhost=os.getenv(f"{prefix}_VHOST", "/"),
+            heartbeat=int(os.getenv(f"{prefix}_HEARTBEAT", "600")),
         )

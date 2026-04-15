@@ -32,7 +32,7 @@ class RabbitMqConnection:
                 port=self._config.port,
                 virtual_host=self._config.vhost,
                 credentials=credentials,
-                heartbeat=60,
+                heartbeat=self._config.heartbeat,
                 blocked_connection_timeout=300,
             )
             self._connection = pika.BlockingConnection(parameters)
